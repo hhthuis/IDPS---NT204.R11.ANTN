@@ -1,0 +1,8 @@
+Test case: TC-07 DNS query
+Test date: 2026-09-17
+Environment: Python 3.12.3, Scapy 2.7.0, pytest 9.1.1
+Command: python -m pytest -v tests/test_dns_query.py
+
+tests/test_dns_query.py::test_dns_query_domain_and_type PASSED [100%]
+
+Result: 1 passed in 0.48s
