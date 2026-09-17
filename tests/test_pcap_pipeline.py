@@ -1,3 +1,4 @@
+import base64
 import json
 
 import pytest
@@ -97,3 +98,16 @@ def test_tcp_handshake(transport_events):
     assert ack["transport"]["fields"]["sequence_number"] == 1001
     assert ack["transport"]["fields"]["acknowledgment_number"] == 2001
     assert ack["payload"]["length"] == 0
+
+
+def test_tcp_data(transport_events):
+    _, events = transport_events
+    event = events[3]
+
+    assert event["transport"]["protocol"] == "TCP"
+    assert event["transport"]["fields"]["flags"] == ["PSH", "ACK"]
+    assert event["transport"]["fields"]["sequence_number"] == 1001
+    assert event["payload"]["length"] == len(TCP_PAYLOAD)
+    assert event["payload"]["preview"] == TCP_PAYLOAD.decode("ascii")
+    assert base64.b64decode(event["payload"]["base64"]) == TCP_PAYLOAD
+    assert event["application"]["protocol"] == "UNKNOWN"
