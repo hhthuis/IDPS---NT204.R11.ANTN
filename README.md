@@ -1,9 +1,9 @@
 # Packet Capture & Parser for IDS
 
-Module đọc packet từ file PCAP, phân tích IPv4, TCP, UDP và HTTP/1.x, sau đó
-chuyển mỗi packet thành một event chuẩn hóa và ghi ra file JSON Lines. Cấu
-trúc event được thiết kế để các module IDS phía sau không cần truy cập trực
-tiếp đối tượng packet của Scapy.
+Module đọc packet từ file PCAP, phân tích IPv4, TCP, UDP, HTTP/1.x và DNS,
+sau đó chuyển mỗi packet thành một event chuẩn hóa và ghi ra file JSON Lines.
+Cấu trúc event được thiết kế để các module IDS phía sau không cần truy cập
+trực tiếp đối tượng packet của Scapy.
 
 ## Trạng thái hiện tại
 
@@ -18,6 +18,10 @@ tiếp đối tượng packet của Scapy.
 - Trích xuất HTTP method, target, version, status code, reason phrase,
   headers và body.
 - Kiểm tra độ đầy đủ của HTTP body bằng Content-Length.
+- Parse DNS query và response trên UDP hoặc TCP.
+- Trích xuất DNS transaction ID, opcode, response code, flags, questions,
+  answers, authority và additional records.
+- Kiểm tra số lượng DNS record thực tế với các count trong header.
 - Ghi nhận timestamp của packet.
 - Lưu payload dưới dạng Base64 và text preview.
 - Chuẩn hóa dữ liệu bằng `PacketEvent`.
@@ -28,7 +32,7 @@ tiếp đối tượng packet của Scapy.
 Chưa triển khai:
 
 - Live capture từ network interface.
-- Parser DNS và SMTP.
+- Parser SMTP.
 - TCP stream reassembly.
 - Bộ test đầy đủ cho unknown protocol, malformed và truncated packet.
 
@@ -95,6 +99,8 @@ Application protocol detector
     ↓
 HTTP parser (khi protocol là HTTP)
     ↓
+DNS parser (khi protocol là DNS)
+    ↓
 PacketEvent
     ↓
 JSONL writer
@@ -119,7 +125,7 @@ ids/
 │   └── application/
 │       ├── detector.py        Nhận diện HTTP, DNS và SMTP
 │       ├── http.py            HTTP/1.x request/response parser
-│       ├── dns.py             Chưa triển khai
+│       ├── dns.py             DNS query/response parser
 │       └── smtp.py            Chưa triển khai
 └── output/
     └── jsonl.py               JSON Lines writer
@@ -194,6 +200,13 @@ python -m pytest -v tests/test_http_post.py
 python -m pytest -v tests/test_http_response.py
 ```
 
+Chạy các test DNS bắt buộc:
+
+```bash
+python -m pytest -v tests/test_dns_query.py
+python -m pytest -v tests/test_dns_response.py
+```
+
 Tài liệu và log kết quả:
 
 - [TCP handshake](TEST/tcp-handshake.md)
@@ -204,24 +217,29 @@ Tài liệu và log kết quả:
 - [HTTP GET](TEST/http-get.md)
 - [HTTP POST](TEST/http-post.md)
 - [HTTP response](TEST/http-response.md)
+- [DNS query](TEST/dns-query.md)
+- [DNS response](TEST/dns-response.md)
 
 Kết quả kiểm thử hiện tại:
 
 ```text
-21 passed
+26 passed
 ```
 
 ## Giới hạn hiện tại
 
 - PCAP kiểm thử transport được tạo bằng Scapy, chưa phải capture từ traffic
   thực tế.
-- Detector đã gắn nhãn DNS và SMTP, nhưng các trường chi tiết của hai giao
-  thức này chưa được parse.
+- Detector đã gắn nhãn SMTP, nhưng các trường chi tiết của SMTP chưa được
+  parse.
 - HTTP parser xử lý một message nằm trọn trong một TCP packet; chưa ghép HTTP
   message bị chia trên nhiều TCP segment.
 - Chưa giải mã `Transfer-Encoding: chunked`; body chunked hiện được giữ ở
   dạng raw body.
 - Header trùng tên được nối bằng dấu phẩy trong output chuẩn hóa.
+- DNS response bắt buộc hiện được kiểm thử với bản ghi `A`; parser lưu được
+  các resource record khác dưới dạng dữ liệu JSON an toàn nhưng chưa có test
+  riêng cho từng loại record.
 - Parser làm việc trên từng packet và chưa ghép dữ liệu từ nhiều TCP segment.
 - Chương trình mới hỗ trợ IPv4 với TCP hoặc UDP.
 
@@ -234,14 +252,14 @@ Kết quả kiểm thử hiện tại:
 - Các phần có sử dụng hỗ trợ AI: `ids/models.py`, `ids/output/jsonl.py`,
   `ids/capture/pcap.py`, `ids/parsers/network.py`,
   `ids/parsers/transport.py`, `ids/parsers/application/detector.py`,
-  `ids/parsers/application/http.py`, `ids/pipeline.py`, `ids/cli.py`,
-  `main.py`, các file trong `tests/` và tài liệu trong `TEST/`.
+  `ids/parsers/application/http.py`, `ids/parsers/application/dns.py`,
+  `ids/pipeline.py`, `ids/cli.py`, `main.py`, các file trong `tests/` và tài
+  liệu trong `TEST/`.
 - Người thực hiện có trách nhiệm kiểm tra, chạy thử và hiểu mã nguồn trước khi
   nộp bài.
 
 ## Kế hoạch tiếp theo
 
-1. Triển khai và kiểm thử DNS query và response.
-2. Triển khai và kiểm thử SMTP command và response.
-3. Kiểm thử unknown và malformed packet.
-4. Thêm live capture dùng chung parsing pipeline.
+1. Triển khai và kiểm thử SMTP command và response.
+2. Kiểm thử unknown và malformed packet.
+3. Thêm live capture dùng chung parsing pipeline.
