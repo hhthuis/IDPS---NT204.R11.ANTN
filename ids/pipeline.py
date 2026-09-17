@@ -14,6 +14,7 @@ from ids.parsers.network import (
     parse_ipv4,
 )
 from ids.parsers.application.detector import detect_application_protocol
+from ids.parsers.application.dns import DnsParseError, parse_dns
 from ids.parsers.application.http import HttpParseError, parse_http
 from ids.parsers.transport import (
     UnsupportedTransportProtocol,
@@ -153,6 +154,37 @@ def parse_packet(
             event.errors.append(
                 ParseError(
                     stage="http",
+                    message=f"{type(error).__name__}: {error}",
+                )
+            )
+
+    elif event.application.protocol == "DNS":
+        try:
+            dns_result = parse_dns(
+                result.payload,
+                result.info.protocol,
+            )
+            event.application = dns_result.application
+
+            if not dns_result.complete:
+                event.parse_status = "partial"
+                event.errors.extend(
+                    ParseError(stage="dns", message=warning)
+                    for warning in dns_result.warnings
+                )
+        except DnsParseError as error:
+            event.parse_status = "partial"
+            event.errors.append(
+                ParseError(
+                    stage="dns",
+                    message=str(error),
+                )
+            )
+        except Exception as error:
+            event.parse_status = "partial"
+            event.errors.append(
+                ParseError(
+                    stage="dns",
                     message=f"{type(error).__name__}: {error}",
                 )
             )
