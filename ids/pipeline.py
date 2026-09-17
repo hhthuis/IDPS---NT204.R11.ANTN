@@ -13,6 +13,7 @@ from ids.parsers.network import (
     UnsupportedNetworkProtocol,
     parse_ipv4,
 )
+from ids.parsers.application.detector import detect_application_protocol
 from ids.parsers.transport import (
     UnsupportedTransportProtocol,
     parse_transport,
@@ -99,11 +100,29 @@ def parse_packet(
                 message=str(error),
             )
         )
+        return event
     except Exception as error:
         event.parse_status = "malformed"
         event.errors.append(
             ParseError(
                 stage="transport",
+                message=f"{type(error).__name__}: {error}",
+            )
+        )
+        return event
+
+    try:
+        event.application.protocol = detect_application_protocol(
+            payload=result.payload,
+            transport_protocol=result.info.protocol,
+            src_port=result.info.src_port,
+            dst_port=result.info.dst_port,
+        )
+    except Exception as error:
+        event.parse_status = "partial"
+        event.errors.append(
+            ParseError(
+                stage="application_detector",
                 message=f"{type(error).__name__}: {error}",
             )
         )

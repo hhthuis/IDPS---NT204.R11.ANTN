@@ -5,4 +5,5 @@ Command: python -m pytest -v tests/test_pcap_pipeline.py::test_tcp_data
 
 tests/test_pcap_pipeline.py::test_tcp_data PASSED [100%]
 
-Result: 1 passed in 0.49s
+Result: 1 passed in 0.71s
+Application detection: HTTP

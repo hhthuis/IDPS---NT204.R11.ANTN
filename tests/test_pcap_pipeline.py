@@ -110,7 +110,7 @@ def test_tcp_data(transport_events):
     assert event["payload"]["length"] == len(TCP_PAYLOAD)
     assert event["payload"]["preview"] == TCP_PAYLOAD.decode("ascii")
     assert base64.b64decode(event["payload"]["base64"]) == TCP_PAYLOAD
-    assert event["application"]["protocol"] == "UNKNOWN"
+    assert event["application"]["protocol"] == "HTTP"
 
 
 def test_udp_data(transport_events):

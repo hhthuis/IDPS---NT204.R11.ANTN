@@ -11,6 +11,9 @@ event được thiết kế để các module IDS phía sau không cần truy c�
 
 - Đọc lần lượt từng packet từ file PCAP bằng Scapy `PcapReader`.
 - Parse IPv4, TCP và UDP.
+- Nhận diện HTTP, DNS và SMTP từ payload kết hợp thông tin transport/port.
+- Nhận diện HTTP request và SMTP command trên port không chuẩn.
+- Nhận diện DNS/UDP và DNS/TCP có length prefix.
 - Ghi nhận timestamp của packet.
 - Lưu payload dưới dạng Base64 và text preview.
 - Chuẩn hóa dữ liệu bằng `PacketEvent`.
@@ -21,7 +24,6 @@ event được thiết kế để các module IDS phía sau không cần truy c�
 Chưa triển khai:
 
 - Live capture từ network interface.
-- Nhận diện application protocol.
 - Parser HTTP/1.x, DNS và SMTP.
 - TCP stream reassembly.
 - Bộ test đầy đủ cho unknown protocol, malformed và truncated packet.
@@ -85,6 +87,8 @@ IPv4 parser
     ↓
 TCP/UDP parser
     ↓
+Application protocol detector
+    ↓
 PacketEvent
     ↓
 JSONL writer
@@ -106,7 +110,11 @@ ids/
 ├── parsers/
 │   ├── network.py             IPv4 parser
 │   ├── transport.py           TCP/UDP parser
-│   └── application/           HTTP/DNS/SMTP chưa triển khai
+│   └── application/
+│       ├── detector.py        Nhận diện HTTP, DNS và SMTP
+│       ├── http.py            Chưa triển khai
+│       ├── dns.py             Chưa triển khai
+│       └── smtp.py            Chưa triển khai
 └── output/
     └── jsonl.py               JSON Lines writer
 tests/                         Kiểm thử tự động và script sinh PCAP
@@ -166,6 +174,12 @@ python -m pytest -v tests/test_pcap_pipeline.py::test_tcp_data
 python -m pytest -v tests/test_pcap_pipeline.py::test_udp_data
 ```
 
+Chạy test cho application protocol detector:
+
+```bash
+python -m pytest -v tests/test_application_detector.py
+```
+
 Tài liệu và log kết quả:
 
 - [TCP handshake](TEST/tcp-handshake.md)
@@ -177,15 +191,17 @@ Tài liệu và log kết quả:
 Kết quả kiểm thử hiện tại:
 
 ```text
-5 passed
+15 passed
 ```
 
 ## Giới hạn hiện tại
 
 - PCAP kiểm thử transport được tạo bằng Scapy, chưa phải capture từ traffic
   thực tế.
-- HTTP request trong TCP payload chưa được parse; `application.protocol` vẫn
-  là `UNKNOWN`.
+- Detector đã gắn nhãn application protocol, nhưng chưa trích xuất các trường
+  chi tiết của HTTP, DNS hoặc SMTP.
+- HTTP request trong TCP payload được nhận diện là `HTTP`, nhưng method,
+  target, headers và body chưa được parse.
 - Parser làm việc trên từng packet và chưa ghép dữ liệu từ nhiều TCP segment.
 - Chương trình mới hỗ trợ IPv4 với TCP hoặc UDP.
 
@@ -193,20 +209,20 @@ Kết quả kiểm thử hiện tại:
 
 - Công cụ: OpenAI Codex.
 - Mục đích: tư vấn kiến trúc, thiết kế cấu trúc event, hướng dẫn và hỗ trợ
-  triển khai PCAP reader, IPv4/TCP/UDP parser, pipeline, JSONL writer, kiểm
-  thử tự động và tài liệu kiểm thử.
+  triển khai PCAP reader, IPv4/TCP/UDP parser, application protocol detector,
+  pipeline, JSONL writer, kiểm thử tự động và tài liệu kiểm thử.
 - Các phần có sử dụng hỗ trợ AI: `ids/models.py`, `ids/output/jsonl.py`,
   `ids/capture/pcap.py`, `ids/parsers/network.py`,
-  `ids/parsers/transport.py`, `ids/pipeline.py`, `ids/cli.py`, `main.py`,
-  các file trong `tests/` và tài liệu trong `TEST/`.
+  `ids/parsers/transport.py`, `ids/parsers/application/detector.py`,
+  `ids/pipeline.py`, `ids/cli.py`, `main.py`, các file trong `tests/` và tài
+  liệu trong `TEST/`.
 - Người thực hiện có trách nhiệm kiểm tra, chạy thử và hiểu mã nguồn trước khi
   nộp bài.
 
 ## Kế hoạch tiếp theo
 
-1. Xây dựng application protocol detector.
-2. Triển khai và kiểm thử HTTP GET, POST và response.
-3. Triển khai và kiểm thử DNS query và response.
-4. Triển khai và kiểm thử SMTP command và response.
-5. Kiểm thử unknown và malformed packet.
-6. Thêm live capture dùng chung parsing pipeline.
+1. Triển khai và kiểm thử HTTP GET, POST và response.
+2. Triển khai và kiểm thử DNS query và response.
+3. Triển khai và kiểm thử SMTP command và response.
+4. Kiểm thử unknown và malformed packet.
+5. Thêm live capture dùng chung parsing pipeline.

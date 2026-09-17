@@ -32,7 +32,8 @@ python -m pytest -v tests/test_pcap_pipeline.py::test_tcp_data
 - Payload length là 38 byte.
 - Payload Base64 giải mã trở lại đúng dữ liệu ban đầu.
 - `parse_status` bằng `ok` và `errors` rỗng.
-- Application protocol vẫn là `UNKNOWN` vì HTTP parser chưa được triển khai.
+- Application protocol được detector nhận diện là `HTTP` dù dùng port 8080.
+- Các trường HTTP chi tiết chưa được parse.
 
 ## Kết quả thực tế
 
@@ -40,11 +41,12 @@ python -m pytest -v tests/test_pcap_pipeline.py::test_tcp_data
 - Flags: `PSH, ACK`.
 - Payload length: 38 byte.
 - Text preview và dữ liệu giải mã từ Base64 khớp payload đầu vào.
-- Application protocol: `UNKNOWN`.
+- Application protocol: `HTTP`.
 - Pytest: `PASSED`.
 - Log: [tcp-data-result.txt](tcp-data-result.txt).
 
 ## Kết luận
 
-Đạt. Pipeline giữ nguyên payload TCP và trích xuất đúng các trường transport.
-Test này chưa được tính là test HTTP GET.
+Đạt. Pipeline giữ nguyên payload TCP, trích xuất đúng các trường transport và
+detector nhận diện payload là HTTP. Test này chưa được tính là HTTP GET parser
+vì method, target, headers và body chưa được trích xuất.
