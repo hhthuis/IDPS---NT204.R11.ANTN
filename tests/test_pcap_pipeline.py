@@ -111,3 +111,18 @@ def test_tcp_data(transport_events):
     assert event["payload"]["preview"] == TCP_PAYLOAD.decode("ascii")
     assert base64.b64decode(event["payload"]["base64"]) == TCP_PAYLOAD
     assert event["application"]["protocol"] == "UNKNOWN"
+
+
+def test_udp_data(transport_events):
+    _, events = transport_events
+    event = events[4]
+
+    assert event["network"]["src_ip"] == "10.0.0.3"
+    assert event["network"]["dst_ip"] == "10.0.0.4"
+    assert event["transport"]["protocol"] == "UDP"
+    assert event["transport"]["src_port"] == 53000
+    assert event["transport"]["dst_port"] == 9999
+    assert event["transport"]["fields"]["length"] == 8 + len(UDP_PAYLOAD)
+    assert event["payload"]["length"] == len(UDP_PAYLOAD)
+    assert base64.b64decode(event["payload"]["base64"]) == UDP_PAYLOAD
+    assert event["payload"]["preview"] == "hello udp"
