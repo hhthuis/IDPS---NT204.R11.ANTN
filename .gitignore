@@ -16,6 +16,7 @@ venv/
 # Runtime output
 output/
 *.jsonl
+!TEST/*.jsonl
 *.log
 
 # System files
