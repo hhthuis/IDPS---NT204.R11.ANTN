@@ -1,0 +1,8 @@
+Test case: TC-04 HTTP GET request
+Test date: 2026-09-17
+Environment: Python 3.12.3, Scapy 2.7.0, pytest 9.1.1
+Command: python -m pytest -v tests/test_http_get.py
+
+tests/test_http_get.py::test_http_get_request PASSED [100%]
+
+Result: 1 passed in 0.45s
