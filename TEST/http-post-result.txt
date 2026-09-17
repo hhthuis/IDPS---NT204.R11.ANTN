@@ -1,0 +1,8 @@
+Test case: TC-05 HTTP POST request
+Test date: 2026-09-17
+Environment: Python 3.12.3, Scapy 2.7.0, pytest 9.1.1
+Command: python -m pytest -v tests/test_http_post.py
+
+tests/test_http_post.py::test_http_post_request_with_body PASSED [100%]
+
+Result: 1 passed in 0.51s
