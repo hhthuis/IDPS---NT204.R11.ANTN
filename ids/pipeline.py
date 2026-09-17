@@ -14,6 +14,7 @@ from ids.parsers.network import (
     parse_ipv4,
 )
 from ids.parsers.application.detector import detect_application_protocol
+from ids.parsers.application.http import HttpParseError, parse_http
 from ids.parsers.transport import (
     UnsupportedTransportProtocol,
     parse_transport,
@@ -126,5 +127,34 @@ def parse_packet(
                 message=f"{type(error).__name__}: {error}",
             )
         )
+        return event
+
+    if event.application.protocol == "HTTP":
+        try:
+            http_result = parse_http(result.payload)
+            event.application = http_result.application
+
+            if not http_result.complete:
+                event.parse_status = "partial"
+                event.errors.extend(
+                    ParseError(stage="http", message=warning)
+                    for warning in http_result.warnings
+                )
+        except HttpParseError as error:
+            event.parse_status = "partial"
+            event.errors.append(
+                ParseError(
+                    stage="http",
+                    message=str(error),
+                )
+            )
+        except Exception as error:
+            event.parse_status = "partial"
+            event.errors.append(
+                ParseError(
+                    stage="http",
+                    message=f"{type(error).__name__}: {error}",
+                )
+            )
 
     return event
