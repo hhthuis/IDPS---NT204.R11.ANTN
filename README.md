@@ -1,18 +1,212 @@
 # Packet Capture & Parser for IDS
 
-Module thu thập packet từ live traffic hoặc file PCAP, phân tích IPv4,
-TCP, UDP, HTTP/1.x, DNS và SMTP, sau đó xuất dữ liệu chuẩn hóa dưới
-định dạng JSON Lines.
+Module đọc packet từ file PCAP, phân tích IPv4, TCP và UDP, sau đó chuyển
+mỗi packet thành một event chuẩn hóa và ghi ra file JSON Lines. Cấu trúc
+event được thiết kế để các module IDS phía sau không cần truy cập trực tiếp
+đối tượng packet của Scapy.
 
-## Yêu cầu
+## Trạng thái hiện tại
 
-- Python 3.12+
-- Quyền root hoặc Linux capabilities khi live capture
+Đã triển khai:
+
+- Đọc lần lượt từng packet từ file PCAP bằng Scapy `PcapReader`.
+- Parse IPv4, TCP và UDP.
+- Ghi nhận timestamp của packet.
+- Lưu payload dưới dạng Base64 và text preview.
+- Chuẩn hóa dữ liệu bằng `PacketEvent`.
+- Ghi mỗi event thành một dòng JSON.
+- Kiểm thử TCP handshake, TCP data và UDP data.
+- Đánh dấu packet không hỗ trợ hoặc lỗi bằng `parse_status` và `errors`.
+
+Chưa triển khai:
+
+- Live capture từ network interface.
+- Nhận diện application protocol.
+- Parser HTTP/1.x, DNS và SMTP.
+- TCP stream reassembly.
+- Bộ test đầy đủ cho unknown protocol, malformed và truncated packet.
+
+## Yêu cầu môi trường
+
+- Python 3.12 trở lên.
+- Linux hoặc WSL được khuyến nghị.
+- Quyền root hoặc Linux capabilities sẽ cần khi live capture được bổ sung.
+
+Phiên bản đã dùng khi kiểm thử ngày 17/09/2026:
+
+- Python 3.12.3.
+- Scapy 2.7.0.
+- pytest 9.1.1.
 
 ## Cài đặt
 
 ```bash
 python -m venv venv
 source venv/bin/activate
+python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
+```
 
+## Sử dụng
+
+Đọc một file PCAP và ghi kết quả ra JSONL:
+
+```bash
+python main.py \
+  --pcap path/to/input.pcap \
+  --output output/events.jsonl
+```
+
+Ví dụ với dữ liệu kiểm thử transport:
+
+```bash
+python -m tests.generate_transport_pcap
+
+python main.py \
+  --pcap TEST/transport-test.pcap \
+  --output TEST/transport-test.jsonl
+```
+
+Kết quả mong đợi:
+
+```text
+Created TEST/transport-test.pcap with 5 packets
+Processed 5 packets. Output: TEST/transport-test.jsonl
+```
+
+## Pipeline xử lý
+
+```text
+PCAP file
+    ↓
+PcapReader
+    ↓
+IPv4 parser
+    ↓
+TCP/UDP parser
+    ↓
+PacketEvent
+    ↓
+JSONL writer
+```
+
+Live capture trong tương lai sẽ đưa packet vào cùng hàm `parse_packet()`.
+
+## Cấu trúc project
+
+```text
+main.py                         Điểm khởi chạy chương trình
+ids/
+├── cli.py                     CLI và điều phối PCAP reader
+├── models.py                  Cấu trúc PacketEvent
+├── pipeline.py                Pipeline parse packet
+├── capture/
+│   ├── pcap.py                Đọc file PCAP
+│   └── live.py                Chưa triển khai
+├── parsers/
+│   ├── network.py             IPv4 parser
+│   ├── transport.py           TCP/UDP parser
+│   └── application/           HTTP/DNS/SMTP chưa triển khai
+└── output/
+    └── jsonl.py               JSON Lines writer
+tests/                         Kiểm thử tự động và script sinh PCAP
+TEST/                          PCAP, JSONL, log và tài liệu kiểm thử
+```
+
+## Cấu trúc event
+
+Mỗi dòng trong output là một JSON object. Ví dụ rút gọn:
+
+```json
+{
+  "schema_version": "1.0",
+  "packet_id": 1,
+  "timestamp": "2026-09-17T00:00:00.000000Z",
+  "source": {
+    "type": "pcap",
+    "name": "transport-test.pcap"
+  },
+  "network": {
+    "protocol": "IPv4",
+    "src_ip": "10.0.0.1",
+    "dst_ip": "10.0.0.2"
+  },
+  "transport": {
+    "protocol": "TCP",
+    "src_port": 51000,
+    "dst_port": 8080,
+    "fields": {
+      "flags": ["SYN"],
+      "sequence_number": 1000
+    }
+  },
+  "application": {
+    "protocol": "UNKNOWN",
+    "kind": null,
+    "fields": {}
+  },
+  "parse_status": "ok",
+  "errors": []
+}
+```
+
+## Kiểm thử
+
+Chạy toàn bộ test:
+
+```bash
+python -m pytest -v
+```
+
+Chạy từng test case transport:
+
+```bash
+python -m pytest -v tests/test_pcap_pipeline.py::test_tcp_handshake
+python -m pytest -v tests/test_pcap_pipeline.py::test_tcp_data
+python -m pytest -v tests/test_pcap_pipeline.py::test_udp_data
+```
+
+Tài liệu và log kết quả:
+
+- [TCP handshake](TEST/tcp-handshake.md)
+- [TCP data](TEST/tcp-data.md)
+- [UDP data](TEST/udp.md)
+- [PCAP đầu vào](TEST/transport-test.pcap)
+- [JSONL đầu ra](TEST/transport-test.jsonl)
+
+Kết quả kiểm thử hiện tại:
+
+```text
+5 passed
+```
+
+## Giới hạn hiện tại
+
+- PCAP kiểm thử transport được tạo bằng Scapy, chưa phải capture từ traffic
+  thực tế.
+- HTTP request trong TCP payload chưa được parse; `application.protocol` vẫn
+  là `UNKNOWN`.
+- Parser làm việc trên từng packet và chưa ghép dữ liệu từ nhiều TCP segment.
+- Chương trình mới hỗ trợ IPv4 với TCP hoặc UDP.
+
+## Sử dụng AI
+
+- Công cụ: OpenAI Codex.
+- Mục đích: tư vấn kiến trúc, thiết kế cấu trúc event, hướng dẫn và hỗ trợ
+  triển khai PCAP reader, IPv4/TCP/UDP parser, pipeline, JSONL writer, kiểm
+  thử tự động và tài liệu kiểm thử.
+- Các phần có sử dụng hỗ trợ AI: `ids/models.py`, `ids/output/jsonl.py`,
+  `ids/capture/pcap.py`, `ids/parsers/network.py`,
+  `ids/parsers/transport.py`, `ids/pipeline.py`, `ids/cli.py`, `main.py`,
+  các file trong `tests/` và tài liệu trong `TEST/`.
+- Người thực hiện có trách nhiệm kiểm tra, chạy thử và hiểu mã nguồn trước khi
+  nộp bài.
+
+## Kế hoạch tiếp theo
+
+1. Xây dựng application protocol detector.
+2. Triển khai và kiểm thử HTTP GET, POST và response.
+3. Triển khai và kiểm thử DNS query và response.
+4. Triển khai và kiểm thử SMTP command và response.
+5. Kiểm thử unknown và malformed packet.
+6. Thêm live capture dùng chung parsing pipeline.
